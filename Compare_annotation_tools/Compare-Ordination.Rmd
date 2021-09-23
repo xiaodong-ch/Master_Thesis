@@ -1,0 +1,85 @@
+---
+title: "Compare-ordination"
+output: html_notebook
+---
+#Part 3 Ordination methods -- PCoA & PERMANOVA
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+library(phyloseq)
+library(tidyverse)
+library(dplyr)
+library(microbiome)
+library(hrbrthemes)
+library(ggplot2)
+```
+Three phyloseq projects from three tools:
+PhySeq_Kraken_20.07.21.rds
+PhySeq_Braken_20.07.21.rds
+PhySeq_Metaphlan_20.07.21.rds
+```{r}
+PhySeq_Kraken_20.07.21 <- readRDS("Kraken/PhySeq_Kraken_20.07.21.rds")
+PhySeq_Braken_20.07.21 <- readRDS("Kraken-Braken/PhySeq_Braken_20.07.21.rds")
+PhySeq_Metaphlan_20.07.21 <- readRDS("Metaphlan3/PhySeq_Metaphlan_20.07.21.rds")
+```
+
+Aggreagre by phylum
+extract infant samples
+```{r}
+#kraken
+aggre_kraken_phy <- aggregate_taxa(PhySeq_Kraken_20.07.21,"phylum") %>% aggregate_rare(level = "phylum", detection = 0.1/100, prevalence = 1/100)
+infant_aggre_kraken_phy <- subset_samples(aggre_kraken_phy, !(sample_type %in% c("F","M"))) %>% microbiome::transform(transform = "compositional")
+#Braken
+aggre_braken_phy <- aggregate_taxa(PhySeq_Braken_20.07.21,"phylum") %>% aggregate_rare(level = "phylum", detection = 0.1/100, prevalence = 1/100)
+infant_aggre_braken_phy <- subset_samples(aggre_braken_phy, !(sample_type %in% c("F","M"))) %>% microbiome::transform(transform = "compositional")
+#Metaphlan
+aggre_meta_phy <- aggregate_taxa(PhySeq_Metaphlan_20.07.21,"Phylum") %>% aggregate_rare(level = "Phylum", detection = 0.1/100, prevalence = 1/100)
+infant_aggre_meta_phy <- subset_samples(aggre_meta_phy, !(sample_type %in% c("F","M"))) %>% microbiome::transform(transform = "compositional")
+```
+Sample ordination
+```{r}
+set.seed(4235421)
+#kraken
+ord_kraken <- ordinate(infant_aggre_kraken_phy, "MDS", "bray")
+#braken
+ord_braken <- ordinate(infant_aggre_braken_phy, "MDS", "bray")
+#Meta
+ord_meta <- ordinate(infant_aggre_meta_phy, "MDS", "bray")
+```
+
+PCoA
+```{r}
+#kraken
+p_kraken <- plot_ordination(infant_aggre_kraken_phy, ord_kraken, color = "sample_type") +
+                geom_point(size=5)+
+                labs(title = "Kraken")
+print(p_kraken)
+
+#braken
+p_braken <- plot_ordination(infant_aggre_braken_phy, ord_braken, color = "sample_type") +
+                geom_point(size=5)+
+                labs(title = "Braken")
+print(p_braken)
+
+
+#meta
+p_meta <- plot_ordination(infant_aggre_meta_phy, ord_meta, color = "sample_type") +
+                geom_point(size=5)+
+                labs(title = "Meta")
+print(p_meta)
+```
+
+PERMANOVA
+```{r}
+#Kraken
+p_kraken_PER <- plot_landscape(infant_aggre_kraken_phy, method = "NMDS", distance = "bray", col = "sample_type", size = 5)
+print(p_kraken_PER)
+
+#Braken
+p_braken_PER <- plot_landscape(infant_aggre_braken_phy, method = "NMDS", distance = "bray", col = "sample_type", size = 5)
+print(p_braken_PER)
+
+#Meta
+p_meta_PER <- plot_landscape(infant_aggre_meta_phy, method = "NMDS", distance = "bray", col = "sample_type", size = 5)
+print(p_meta_PER)
+```
+

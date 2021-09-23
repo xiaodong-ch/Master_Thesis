@@ -1,0 +1,148 @@
+---
+title: "Compare-composition-HumGut"
+output: html_notebook
+---
+#Part 1 Microbiome composition (HumGut data)
+
+This notebook will only run on the Kraken_HumGut & Braken_HumGut
+Here I also added the Meta data to test if the color system is the same
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+library(phyloseq)
+library(tidyverse)
+library(dplyr)
+library(microbiome)
+library(hrbrthemes)
+```
+Two phyloseq projects from HumGut:
+PhySeq_KrakenHG_06.09.21.rds
+PhySeq_BrakenHG_06.09.21.rds
+```{r}
+PhySeq_KrakenHG_06.09.21 <- readRDS("Kraken-HumGut/PhySeq_KrakenHG_06.09.21.rds")
+PhySeq_BrakenHG_06.09.21 <- readRDS("Braken-HumGut/PhySeq_BrakenHG_06.09.21.rds")
+PhySeq_Metaphlan_20.07.21 <- readRDS("Metaphlan3/PhySeq_Metaphlan_20.07.21.rds")
+```
+
+Aggreagre by phylum
+extract infant samples
+```{r}
+#kraken_HG
+aggre_krakenHG_phy <- aggregate_taxa(PhySeq_KrakenHG_06.09.21,"phylum") %>% aggregate_rare(level = "phylum", detection = 0.1/100, prevalence = 1/100)
+infant_aggre_krakenHG_phy <- subset_samples(aggre_krakenHG_phy, !(sample_type %in% c("F","M"))) %>% microbiome::transform(transform = "compositional")
+
+#kraken_HG_allknown
+aggre_krakenHG_allknown_phy <- aggregate_taxa(PhySeq_KrakenHG_06.09.21,"phylum") %>% aggregate_rare(level = "phylum", detection = 0.1/100, prevalence = 1/100) %>% subset_taxa(!(phylum=="Unknown"))
+infant_aggre_krakenHG_allknown_phy <- subset_samples(aggre_krakenHG_allknown_phy, !(sample_type %in% c("F","M"))) %>% microbiome::transform(transform = "compositional")
+
+#Braken_HG
+aggre_brakenHG_phy <- aggregate_taxa(PhySeq_BrakenHG_06.09.21,"phylum") %>% aggregate_rare(level = "phylum", detection = 0.1/100, prevalence = 1/100)
+infant_aggre_brakenHG_phy <- subset_samples(aggre_brakenHG_phy, !(sample_type %in% c("F","M"))) %>% microbiome::transform(transform = "compositional")
+
+#Metaphlan
+aggre_meta_phy <- aggregate_taxa(PhySeq_Metaphlan_20.07.21,"Phylum") %>% aggregate_rare(level = "Phylum", detection = 0.1/100, prevalence = 1/100)
+infant_aggre_meta_phy <- subset_samples(aggre_meta_phy, !(sample_type %in% c("F","M"))) %>% microbiome::transform(transform = "compositional")
+
+```
+Barplot
+```{r}
+#krakenHG
+p_infant_aggre_krakenHG <- plot_composition(infant_aggre_krakenHG_phy,
+              taxonomic.level = "phylum",
+                      sample.sort = "sample_type",
+                      x.label = "sample_type") +
+     guides(fill = guide_legend(ncol = 1)) +
+     scale_y_percent() +
+  
+  
+     labs(x = "sample_type", y = "Relative abundance (%)",
+                                   title = "Relative abundance data",
+                                  subtitle = "Kraken_HG",
+                                  caption = "infant_data,aggregated on phylum")
+print(p_infant_aggre_krakenHG)
+
+#krakenHG_allknown
+p_infant_aggre_krakenHG_allknown <- plot_composition(infant_aggre_krakenHG_allknown_phy,
+              taxonomic.level = "phylum",
+                      sample.sort = "sample_type",
+                      x.label = "sample_type") +
+     guides(fill = guide_legend(ncol = 1)) +
+     scale_y_percent() +
+  
+  
+     labs(x = "sample_type", y = "Relative abundance (%)",
+                                   title = "Relative abundance data",
+                                  subtitle = "Kraken_HG_allknown",
+                                  caption = "infant_data,aggregated on phylum")
+print(p_infant_aggre_krakenHG_allknown)
+
+#braken
+p_infant_aggre_brakenHG <- plot_composition(infant_aggre_brakenHG_phy,
+              taxonomic.level = "phylum",
+                      sample.sort = "sample_type",
+                      x.label = "sample_type") +
+     guides(fill = guide_legend(ncol = 1)) +
+     scale_y_percent() +
+  
+  
+     labs(x = "sample_type", y = "Relative abundance (%)",
+                                   title = "Relative abundance data",
+                                  subtitle = "Braken_HG",
+                                  caption = "infant_data,aggregated on phylum")
+print(p_infant_aggre_brakenHG)
+
+#Meta (to show the color system is the same with *_rare plots) 
+p_infant_aggre_meta <- plot_composition(infant_aggre_meta_phy,
+              taxonomic.level = "Phylum",
+                      sample.sort = "sample_type",
+                      x.label = "sample_type") +
+     guides(fill = guide_legend(ncol = 1)) +
+     scale_y_percent() +
+  
+  
+     labs(x = "sample_type", y = "Relative abundance (%)",
+                                   title = "Relative abundance data",
+                                  subtitle = "Metaphlan",
+                                  caption = "infant_data,aggregated on phylum")
+print(p_infant_aggre_meta)
+```
+
+Averaged by group
+```{r}
+#krakenHG
+sample_data(infant_aggre_krakenHG_phy)$sample_type_factor <- sample_data(infant_aggre_krakenHG_phy)$sample_type %>% as.factor()
+p_aver_infant_aggre_krakenHG <- plot_composition(infant_aggre_krakenHG_phy,
+                      average_by = "sample_type_factor", transform = "compositional")+
+  
+  
+     labs(x = "sample_type", y = "Abundance",
+                                   title = "Averaged by sample_type",
+                                  subtitle = "Kraken_HG",
+                                  caption = "infant_data,aggregated on phylum")
+print(p_aver_infant_aggre_krakenHG)
+
+#krakenHG_allknown
+sample_data(infant_aggre_krakenHG_allknown_phy)$sample_type_factor <- sample_data(infant_aggre_krakenHG_allknown_phy)$sample_type %>% as.factor()
+p_aver_infant_aggre_krakenHG_allknown <- plot_composition(infant_aggre_krakenHG_allknown_phy,
+                      average_by = "sample_type_factor", transform = "compositional")+
+  
+  
+     labs(x = "sample_type", y = "Abundance",
+                                   title = "Averaged by sample_type",
+                                  subtitle = "Kraken_HG_allknown",
+                                  caption = "infant_data,aggregated on phylum")
+print(p_aver_infant_aggre_krakenHG_allknown)
+
+#braken
+sample_data(infant_aggre_brakenHG_phy)$sample_type_factor <- sample_data(infant_aggre_brakenHG_phy)$sample_type %>% as.factor()
+p_aver_infant_aggre_brakenHG <- plot_composition(infant_aggre_brakenHG_phy,
+                      average_by = "sample_type_factor", transform = "compositional")+
+  
+  
+     labs(x = "sample_type", y = "Abundance",
+                                   title = "Averaged by sample_type",
+                                  subtitle = "Braken_HG",
+                                  caption = "infant_data,aggregated on phylum")
+print(p_aver_infant_aggre_brakenHG)
+
+```
+

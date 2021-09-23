@@ -1,0 +1,90 @@
+---
+title: "Compare-ordination-HumGut"
+output: html_notebook
+---
+#Part 3 Ordination methods -- PCoA & PERMANOVA (HumGut data)
+This notebook will only run on the Kraken_HumGut & Braken_HumGut
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+library(phyloseq)
+library(tidyverse)
+library(dplyr)
+library(microbiome)
+library(hrbrthemes)
+library(ggplot2)
+```
+Two phyloseq projects from HumGut:
+PhySeq_KrakenHG_06.09.21.rds
+PhySeq_BrakenHG_06.09.21.rds
+```{r}
+PhySeq_KrakenHG_06.09.21 <- readRDS("Kraken-HumGut/PhySeq_KrakenHG_06.09.21.rds")
+PhySeq_BrakenHG_06.09.21 <- readRDS("Braken-HumGut/PhySeq_BrakenHG_06.09.21.rds")
+```
+
+Aggreagre by phylum
+extract infant samples
+```{r}
+#kraken_HG
+aggre_krakenHG_phy <- aggregate_taxa(PhySeq_KrakenHG_06.09.21,"phylum") %>% aggregate_rare(level = "phylum", detection = 0.1/100, prevalence = 1/100)
+infant_aggre_krakenHG_phy <- subset_samples(aggre_krakenHG_phy, !(sample_type %in% c("F","M"))) %>% microbiome::transform(transform = "compositional")
+
+#kraken_HG_allknown
+aggre_krakenHG_allknown_phy <- aggregate_taxa(PhySeq_KrakenHG_06.09.21,"phylum") %>% aggregate_rare(level = "phylum", detection = 0.1/100, prevalence = 1/100) %>% subset_taxa(!(phylum=="Unknown"))
+infant_aggre_krakenHG_allknown_phy <- subset_samples(aggre_krakenHG_allknown_phy, !(sample_type %in% c("F","M"))) %>% microbiome::transform(transform = "compositional")
+
+#Braken_HG
+aggre_brakenHG_phy <- aggregate_taxa(PhySeq_BrakenHG_06.09.21,"phylum") %>% aggregate_rare(level = "phylum", detection = 0.1/100, prevalence = 1/100)
+infant_aggre_brakenHG_phy <- subset_samples(aggre_brakenHG_phy, !(sample_type %in% c("F","M"))) %>% microbiome::transform(transform = "compositional") # try "CLR" here 
+```
+
+Sample ordination
+```{r}
+set.seed(4235421)
+#krakenHG
+ord_krakenHG <- ordinate(infant_aggre_krakenHG_phy, "MDS", "bray") #"jensen"
+#krakenHG_allknown
+ord_krakenHG_allknown <- ordinate(infant_aggre_krakenHG_allknown_phy, "MDS", "bray")
+#brakenHG
+ord_brakenHG <- ordinate(infant_aggre_brakenHG_phy, "MDS", "bray")
+
+```
+
+PCoA
+```{r}
+#krakenHG
+p_krakenHG <- plot_ordination(infant_aggre_krakenHG_phy, ord_krakenHG, color = "sample_type") +
+                geom_point(size=5)+
+                labs(title = "Kraken_HG")
+print(p_krakenHG)
+
+#krakenHG_allknown
+p_krakenHG_allknown <- plot_ordination(infant_aggre_krakenHG_allknown_phy, ord_krakenHG_allknown, color = "sample_type") +
+                geom_point(size=5)+
+                labs(title = "Kraken_HG_allknown")
+print(p_krakenHG_allknown)
+
+#brakenHG
+p_brakenHG <- plot_ordination(infant_aggre_brakenHG_phy, ord_brakenHG, color = "sample_type") +
+                geom_point(size=5)+
+                labs(title = "Braken_HG")
+print(p_brakenHG)
+
+
+```
+
+PERMANOVA
+```{r}
+#KrakenHG
+p_krakenHG_PER <- plot_landscape(infant_aggre_krakenHG_phy, method = "NMDS", distance = "bray", col = "sample_type", size = 5)
+print(p_krakenHG_PER)
+
+#KrakenHG_allknown
+p_krakenHG_allknown_PER <- plot_landscape(infant_aggre_krakenHG_allknown_phy, method = "NMDS", distance = "bray", col = "sample_type", size = 5)
+print(p_krakenHG_allknown_PER)
+
+#BrakenHG
+p_brakenHG_PER <- plot_landscape(infant_aggre_brakenHG_phy, method = "NMDS", distance = "bray", col = "sample_type", size = 5)
+print(p_brakenHG_PER)
+
+```
+

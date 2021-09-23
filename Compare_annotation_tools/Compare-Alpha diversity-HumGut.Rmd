@@ -1,0 +1,706 @@
+---
+title: "Compare-Alpha diversity-HumGut"
+output: html_notebook
+---
+#Part 2 Alpha diversity （HumGut data）
+
+This notebook creats for HumGut
+But also includes typical data for comparison
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+library(phyloseq)
+library(tidyverse)
+library(dplyr)
+library(microbiome)
+library(hrbrthemes)
+library(knitr)
+library(viridis)
+library(fantaxtic)
+```
+Two phyloseq projects from HumGut:
+PhySeq_KrakenHG_06.09.21.rds
+PhySeq_BrakenHG_06.09.21.rds
+```{r}
+#typical
+PhySeq_Kraken_20.07.21 <- readRDS("Kraken/PhySeq_Kraken_20.07.21.rds")
+PhySeq_Braken_20.07.21 <- readRDS("Kraken-Braken/PhySeq_Braken_20.07.21.rds")
+PhySeq_Metaphlan_20.07.21 <- readRDS("Metaphlan3/PhySeq_Metaphlan_20.07.21.rds")
+
+#HG
+PhySeq_KrakenHG_06.09.21 <- readRDS("Kraken-HumGut/PhySeq_KrakenHG_06.09.21.rds")
+PhySeq_BrakenHG_06.09.21 <- readRDS("Braken-HumGut/PhySeq_BrakenHG_06.09.21.rds")
+```
+
+##Alpha diversity visualization
+Prepare
+```{r}
+####################################typical############################################
+#kraken
+aggre_kraken_phy <- aggregate_taxa(PhySeq_Kraken_20.07.21,"species") %>% aggregate_rare(level = "species", detection = 0.1/100, prevalence = 1/100)
+infant_aggre_kraken_phy <- subset_samples(aggre_kraken_phy, !(sample_type %in% c("F","M"))) %>% microbiome::transform(transform = "compositional")
+#kraken_allknown
+aggre_kraken_allknown_phy <- aggregate_taxa(PhySeq_Kraken_20.07.21,"species") %>% aggregate_rare(level = "species", detection = 0.1/100, prevalence = 1/100) %>% subset_taxa(!(species=="Unknown"))
+infant_aggre_kraken_allknown_phy <- subset_samples(aggre_kraken_allknown_phy, !(sample_type %in% c("F","M"))) %>% microbiome::transform(transform = "compositional")
+#Braken
+aggre_braken_phy <- aggregate_taxa(PhySeq_Braken_20.07.21,"species") %>% aggregate_rare(level = "species", detection = 0.1/100, prevalence = 1/100)
+infant_aggre_braken_phy <- subset_samples(aggre_braken_phy, !(sample_type %in% c("F","M"))) %>% microbiome::transform(transform = "compositional")
+#Metaphlan
+aggre_meta_phy <- aggregate_taxa(PhySeq_Metaphlan_20.07.21,"species") %>% aggregate_rare(level = "species", detection = 0.1/100, prevalence = 1/100)
+infant_aggre_meta_phy <- subset_samples(aggre_meta_phy, !(sample_type %in% c("F","M"))) %>% microbiome::transform(transform = "compositional")
+
+#################################################HG###############################
+#kraken_HG
+aggre_krakenHG_phy <- aggregate_taxa(PhySeq_KrakenHG_06.09.21,"species") %>% aggregate_rare(level = "species", detection = 0.1/100, prevalence = 1/100)
+infant_aggre_krakenHG_phy <- subset_samples(aggre_krakenHG_phy, !(sample_type %in% c("F","M"))) %>% microbiome::transform(transform = "compositional")
+
+#kraken_HG_allknown
+aggre_krakenHG_allknown_phy <- aggregate_taxa(PhySeq_KrakenHG_06.09.21,"species") %>% aggregate_rare(level = "species", detection = 0.1/100, prevalence = 1/100) %>% subset_taxa(!(species=="Unknown"))
+infant_aggre_krakenHG_allknown_phy <- subset_samples(aggre_krakenHG_allknown_phy, !(sample_type %in% c("F","M"))) %>% microbiome::transform(transform = "compositional")
+
+#Braken_HG
+aggre_brakenHG_phy <- aggregate_taxa(PhySeq_BrakenHG_06.09.21,"species") %>% aggregate_rare(level = "species", detection = 0.1/100, prevalence = 1/100)
+infant_aggre_brakenHG_phy <- subset_samples(aggre_brakenHG_phy, !(sample_type %in% c("F","M"))) %>% microbiome::transform(transform = "compositional")
+
+```
+
+Alpha diversity
+```{r}
+################################typical####################################
+#kraken
+alpha__kraken <-microbiome::alpha(infant_aggre_kraken_phy, index = c("observed","shannon","chao1"))
+kable(head(alpha__kraken))
+#kraken_allknown
+alpha__kraken_allknown <-microbiome::alpha(infant_aggre_kraken_allknown_phy, index = c("observed","shannon","chao1"))
+kable(head(alpha__kraken_allknown))
+#braken
+alpha__braken <-microbiome::alpha(infant_aggre_braken_phy, index = c("observed","shannon","chao1"))
+kable(head(alpha__braken))
+#meta
+alpha__meta <-microbiome::alpha(infant_aggre_meta_phy, index = c("observed","shannon","chao1"))
+kable(head(alpha__meta))
+
+#####################################HG########################################
+#krakenHG
+alpha__krakenHG <-microbiome::alpha(infant_aggre_krakenHG_phy, index = c("observed","shannon","chao1"))
+kable(head(alpha__krakenHG))
+
+#krakenHG_allknown
+alpha__krakenHG_allknown <-microbiome::alpha(infant_aggre_krakenHG_allknown_phy, index = c("observed","shannon","chao1"))
+kable(head(alpha__krakenHG_allknown))
+
+#brakenHG
+alpha__brakenHG <-microbiome::alpha(infant_aggre_brakenHG_phy, index = c("observed","shannon","chao1"))
+kable(head(alpha__brakenHG))
+
+```
+
+boxplot by time flow
+```{r}
+###############################typical########################################
+#kraken
+sample_kraken <- sample_data(infant_aggre_kraken_phy)
+box_kraken <- merge(sample_kraken, alpha__kraken, by = 0) %>% data.frame()
+
+p_box_kraken <- box_kraken %>% ggplot(aes(x=sample_type, y=diversity_shannon)) +
+  geom_boxplot() +
+  geom_jitter(color="black", size=0.6, alpha=0.9)+
+  labs(title = "Kraken", caption = "shannon") +
+  ylim(c(0,4)) +
+  theme(plot.title = element_text(size=11))
+print(p_box_kraken)
+
+#kraken_allknown
+sample_kraken_allknown <- sample_data(infant_aggre_kraken_allknown_phy)
+box_kraken_allknown <- merge(sample_kraken_allknown, alpha__kraken_allknown, by = 0) %>% data.frame()
+
+p_box_kraken_allknown <- box_kraken_allknown %>% ggplot(aes(x=sample_type, y=diversity_shannon)) +
+  geom_boxplot() +
+  geom_jitter(color="black", size=0.6, alpha=0.9)+
+  labs(title = "Kraken_allknown", caption = "shannon") +
+  ylim(c(0,4)) +
+  theme(plot.title = element_text(size=11))
+print(p_box_kraken_allknown)
+
+#braken
+sample_braken <- sample_data(infant_aggre_braken_phy)
+box_braken <- merge(sample_braken, alpha__braken, by = 0) %>% data.frame()
+
+p_box_braken <- box_braken %>% ggplot(aes(x=sample_type, y=diversity_shannon)) +
+  geom_boxplot() +
+  geom_jitter(color="black", size=0.6, alpha=0.9)+
+  labs(title = "Braken", caption = "shannon") +
+  ylim(c(0,4)) +
+  theme(plot.title = element_text(size=11))
+print(p_box_braken)
+
+#meta
+sample_meta <- sample_data(infant_aggre_meta_phy)
+box_meta <- merge(sample_meta, alpha__meta, by = 0) %>% data.frame()
+
+p_box_meta <- box_meta %>% ggplot(aes(x=sample_type, y=diversity_shannon)) +
+  geom_boxplot() +
+  geom_jitter(color="black", size=0.6, alpha=0.9)+
+  labs(title = "Meta", caption = "shannon") +
+  ylim(c(0,4)) +
+  theme(plot.title = element_text(size=11))
+print(p_box_meta)
+
+###########################HG################################################
+#krakenHG
+sample_krakenHG <- sample_data(infant_aggre_krakenHG_phy)
+box_krakenHG <- merge(sample_krakenHG, alpha__krakenHG, by = 0) %>% data.frame()
+
+p_box_krakenHG <- box_krakenHG %>% ggplot(aes(x=sample_type, y=diversity_shannon)) +
+  geom_boxplot() +
+  geom_jitter(color="black", size=0.6, alpha=0.9)+
+  labs(title = "Kraken_HG", caption = "shannon") +
+  ylim(c(0,4)) +
+  theme(plot.title = element_text(size=11))
+print(p_box_krakenHG)
+
+#krakenHG_allknown
+sample_krakenHG_allknown <- sample_data(infant_aggre_krakenHG_allknown_phy)
+box_krakenHG_allknown <- merge(sample_krakenHG_allknown, alpha__krakenHG_allknown, by = 0) %>% data.frame()
+
+p_box_krakenHG_allknown <- box_krakenHG_allknown %>% ggplot(aes(x=sample_type, y=diversity_shannon)) +
+  geom_boxplot() +
+  geom_jitter(color="black", size=0.6, alpha=0.9)+
+  labs(title = "Kraken_HG_allknown", caption = "shannon") +
+  ylim(c(0,4)) +
+  theme(plot.title = element_text(size=11))
+print(p_box_krakenHG_allknown)
+
+#brakenHG
+sample_brakenHG <- sample_data(infant_aggre_brakenHG_phy)
+box_brakenHG <- merge(sample_brakenHG, alpha__brakenHG, by = 0) %>% data.frame()
+
+p_box_brakenHG <- box_brakenHG %>% ggplot(aes(x=sample_type, y=diversity_shannon)) +
+  geom_boxplot() +
+  geom_jitter(color="black", size=0.6, alpha=0.9)+
+  labs(title = "Braken_HG", caption = "shannon") +
+  ylim(c(0,4)) +
+  theme(plot.title = element_text(size=11))
+print(p_box_brakenHG)
+```
+
+boxplot compare just among HumGut
+```{r}
+#B1
+box_krakenHG_B1 <- filter(box_krakenHG, sample_type == "B1") %>% select(diversity_shannon)
+box_krakenHG_B1$name <- "KrakenHG"
+box_krakenHG_allknown_B1 <- filter(box_krakenHG_allknown, sample_type == "B1") %>% select(diversity_shannon)
+box_krakenHG_allknown_B1$name <- "KrakenHG_allknown"
+box_brakenHG_B1 <- filter(box_brakenHG, sample_type == "B1") %>% select(diversity_shannon)
+box_brakenHG_B1$name <- "BrakenHG"
+
+box_B1 <- rbind(box_krakenHG_B1, box_krakenHG_allknown_B1) %>% rbind(box_brakenHG_B1)
+
+p_box_B1 <- box_B1 %>% ggplot(aes(x=name, y=diversity_shannon)) +
+  geom_boxplot() +
+  geom_jitter(color="black", size=0.6, alpha=0.9)+
+  labs(title = "HumGut", caption = "shannon") +
+  xlab("B1")
+  theme(plot.title = element_text(size=11))
+print(p_box_B1)
+
+#B4
+box_krakenHG_B4 <- filter(box_krakenHG, sample_type == "B4") %>% select(diversity_shannon)
+box_krakenHG_B4$name <- "KrakenHG"
+box_krakenHG_allknown_B4 <- filter(box_krakenHG_allknown, sample_type == "B4") %>% select(diversity_shannon)
+box_krakenHG_allknown_B4$name <- "KrakenHG_allknown"
+box_brakenHG_B4 <- filter(box_brakenHG, sample_type == "B4") %>% select(diversity_shannon)
+box_brakenHG_B4$name <- "BrakenHG"
+
+box_B4 <- rbind(box_krakenHG_B4, box_krakenHG_allknown_B4) %>% rbind(box_brakenHG_B4)
+
+p_box_B4 <- box_B4 %>% ggplot(aes(x=name, y=diversity_shannon)) +
+  geom_boxplot() +
+  geom_jitter(color="black", size=0.6, alpha=0.9)+
+  labs(title = "HumGut", caption = "shannon") +
+  xlab("B4")
+  theme(plot.title = element_text(size=11))
+print(p_box_B4)
+
+#B5
+box_krakenHG_B5 <- filter(box_krakenHG, sample_type == "B5") %>% select(diversity_shannon)
+box_krakenHG_B5$name <- "KrakenHG"
+box_krakenHG_allknown_B5 <- filter(box_krakenHG_allknown, sample_type == "B5") %>% select(diversity_shannon)
+box_krakenHG_allknown_B5$name <- "KrakenHG_allknown"
+box_brakenHG_B5 <- filter(box_brakenHG, sample_type == "B5") %>% select(diversity_shannon)
+box_brakenHG_B5$name <- "BrakenHG"
+
+box_B5 <- rbind(box_krakenHG_B5, box_krakenHG_allknown_B5) %>% rbind(box_brakenHG_B5)
+
+p_box_B5 <- box_B5 %>% ggplot(aes(x=name, y=diversity_shannon)) +
+  geom_boxplot() +
+  geom_jitter(color="black", size=0.6, alpha=0.9)+
+  labs(title = "HumGut", caption = "shannon") +
+  xlab("B5")
+  theme(plot.title = element_text(size=11))
+print(p_box_B5)
+
+#B7
+box_krakenHG_B7 <- filter(box_krakenHG, sample_type == "B7") %>% select(diversity_shannon)
+box_krakenHG_B7$name <- "KrakenHG"
+box_krakenHG_allknown_B7 <- filter(box_krakenHG_allknown, sample_type == "B7") %>% select(diversity_shannon)
+box_krakenHG_allknown_B7$name <- "KrakenHG_allknown"
+box_brakenHG_B7 <- filter(box_brakenHG, sample_type == "B7") %>% select(diversity_shannon)
+box_brakenHG_B7$name <- "BrakenHG"
+
+box_B7 <- rbind(box_krakenHG_B7, box_krakenHG_allknown_B7) %>% rbind(box_brakenHG_B7)
+
+p_box_B7 <- box_B7 %>% ggplot(aes(x=name, y=diversity_shannon)) +
+  geom_boxplot() +
+  geom_jitter(color="black", size=0.6, alpha=0.9)+
+  labs(title = "HumGut", caption = "shannon") +
+  xlab("B7")
+  theme(plot.title = element_text(size=11))
+print(p_box_B7)
+```
+
+Boxplot compare among all data
+```{r}
+############################B1########################################
+#typical
+box_kraken_B1 <- filter(box_kraken, sample_type == "B1") %>% select(diversity_shannon)
+box_kraken_B1$name <- "Kraken"
+box_kraken_allknown_B1 <- filter(box_kraken_allknown, sample_type == "B1") %>% select(diversity_shannon)
+box_kraken_allknown_B1$name <- "Kraken_allknown"
+box_braken_B1 <- filter(box_braken, sample_type == "B1") %>% select(diversity_shannon)
+box_braken_B1$name <- "Braken"
+#HG
+box_krakenHG_B1 <- filter(box_krakenHG, sample_type == "B1") %>% select(diversity_shannon)
+box_krakenHG_B1$name <- "KrakenHG"
+box_krakenHG_allknown_B1 <- filter(box_krakenHG_allknown, sample_type == "B1") %>% select(diversity_shannon)
+box_krakenHG_allknown_B1$name <- "KrakenHG_allknown"
+box_brakenHG_B1 <- filter(box_brakenHG, sample_type == "B1") %>% select(diversity_shannon)
+box_brakenHG_B1$name <- "BrakenHG"
+#meta
+box_meta_B1 <- filter(box_meta, sample_type == "B1") %>% select(diversity_shannon)
+box_meta_B1$name <- "Meta"
+
+#plot
+box_B1_all <- rbind(box_krakenHG_B1, box_krakenHG_allknown_B1, box_brakenHG_B1,
+                    box_kraken_B1, box_kraken_allknown_B1, box_braken_B1,
+                    box_meta_B1)
+
+box_B1_all$name_class <- factor(box_B1_all$name, levels = c("Kraken", "Kraken_allknown", "Braken", 
+                                                            "KrakenHG", "KrakenHG_allknown", "BrakenHG",
+                                                            "Meta"))
+
+p_box_B1_all <- box_B1_all %>% ggplot(aes(x=name, y=diversity_shannon)) +
+  geom_boxplot() +
+  geom_jitter(color="black", size=0.6, alpha=0.9)+
+  labs(title = "All data", caption = "shannon") +
+  xlab("B1")
+  theme(plot.title = element_text(size=11))
+print(p_box_B1_all)
+
+############################B4########################################
+#typical
+box_kraken_B4 <- filter(box_kraken, sample_type == "B4") %>% select(diversity_shannon)
+box_kraken_B4$name <- "Kraken"
+box_kraken_allknown_B4 <- filter(box_kraken_allknown, sample_type == "B4") %>% select(diversity_shannon)
+box_kraken_allknown_B4$name <- "Kraken_allknown"
+box_braken_B4 <- filter(box_braken, sample_type == "B4") %>% select(diversity_shannon)
+box_braken_B4$name <- "Braken"
+#HG
+box_krakenHG_B4 <- filter(box_krakenHG, sample_type == "B4") %>% select(diversity_shannon)
+box_krakenHG_B4$name <- "KrakenHG"
+box_krakenHG_allknown_B4 <- filter(box_krakenHG_allknown, sample_type == "B4") %>% select(diversity_shannon)
+box_krakenHG_allknown_B4$name <- "KrakenHG_allknown"
+box_brakenHG_B4 <- filter(box_brakenHG, sample_type == "B4") %>% select(diversity_shannon)
+box_brakenHG_B4$name <- "BrakenHG"
+#meta
+box_meta_B4 <- filter(box_meta, sample_type == "B4") %>% select(diversity_shannon)
+box_meta_B4$name <- "Meta"
+
+#plot
+box_B4_all <- rbind(box_krakenHG_B4, box_krakenHG_allknown_B4, box_brakenHG_B4,
+                    box_kraken_B4, box_kraken_allknown_B4, box_braken_B4,
+                    box_meta_B4)
+
+box_B4_all$name_class <- factor(box_B4_all$name, levels = c("Kraken", "Kraken_allknown", "Braken", 
+                                                            "KrakenHG", "KrakenHG_allknown", "BrakenHG",
+                                                            "Meta"))
+
+p_box_B4_all <- box_B4_all %>% ggplot(aes(x=name, y=diversity_shannon)) +
+  geom_boxplot() +
+  geom_jitter(color="black", size=0.6, alpha=0.9)+
+  labs(title = "All data", caption = "shannon") +
+  xlab("B4")
+  theme(plot.title = element_text(size=11))
+print(p_box_B4_all)
+
+############################B5########################################
+#typical
+box_kraken_B5 <- filter(box_kraken, sample_type == "B5") %>% select(diversity_shannon)
+box_kraken_B5$name <- "Kraken"
+box_kraken_allknown_B5 <- filter(box_kraken_allknown, sample_type == "B5") %>% select(diversity_shannon)
+box_kraken_allknown_B5$name <- "Kraken_allknown"
+box_braken_B5 <- filter(box_braken, sample_type == "B5") %>% select(diversity_shannon)
+box_braken_B5$name <- "Braken"
+#HG
+box_krakenHG_B5 <- filter(box_krakenHG, sample_type == "B5") %>% select(diversity_shannon)
+box_krakenHG_B5$name <- "KrakenHG"
+box_krakenHG_allknown_B5 <- filter(box_krakenHG_allknown, sample_type == "B5") %>% select(diversity_shannon)
+box_krakenHG_allknown_B5$name <- "KrakenHG_allknown"
+box_brakenHG_B5 <- filter(box_brakenHG, sample_type == "B5") %>% select(diversity_shannon)
+box_brakenHG_B5$name <- "BrakenHG"
+#meta
+box_meta_B5 <- filter(box_meta, sample_type == "B5") %>% select(diversity_shannon)
+box_meta_B5$name <- "Meta"
+
+#plot
+box_B5_all <- rbind(box_krakenHG_B5, box_krakenHG_allknown_B5, box_brakenHG_B5,
+                    box_kraken_B5, box_kraken_allknown_B5, box_braken_B5,
+                    box_meta_B5)
+
+box_B5_all$name_class <- factor(box_B5_all$name, levels = c("Kraken", "Kraken_allknown", "Braken", 
+                                                            "KrakenHG", "KrakenHG_allknown", "BrakenHG",
+                                                            "Meta"))
+
+p_box_B5_all <- box_B5_all %>% ggplot(aes(x=name, y=diversity_shannon)) +
+  geom_boxplot() +
+  geom_jitter(color="black", size=0.6, alpha=0.9)+
+  labs(title = "All data", caption = "shannon") +
+  xlab("B5")
+  theme(plot.title = element_text(size=11))
+print(p_box_B5_all)
+
+############################B7########################################
+#typical
+box_kraken_B7 <- filter(box_kraken, sample_type == "B7") %>% select(diversity_shannon)
+box_kraken_B7$name <- "Kraken"
+box_kraken_allknown_B7 <- filter(box_kraken_allknown, sample_type == "B7") %>% select(diversity_shannon)
+box_kraken_allknown_B7$name <- "Kraken_allknown"
+box_braken_B7 <- filter(box_braken, sample_type == "B7") %>% select(diversity_shannon)
+box_braken_B7$name <- "Braken"
+#HG
+box_krakenHG_B7 <- filter(box_krakenHG, sample_type == "B7") %>% select(diversity_shannon)
+box_krakenHG_B7$name <- "KrakenHG"
+box_krakenHG_allknown_B7 <- filter(box_krakenHG_allknown, sample_type == "B7") %>% select(diversity_shannon)
+box_krakenHG_allknown_B7$name <- "KrakenHG_allknown"
+box_brakenHG_B7 <- filter(box_brakenHG, sample_type == "B7") %>% select(diversity_shannon)
+box_brakenHG_B7$name <- "BrakenHG"
+#meta
+box_meta_B7 <- filter(box_meta, sample_type == "B7") %>% select(diversity_shannon)
+box_meta_B7$name <- "Meta"
+
+#plot
+box_B7_all <- rbind(box_krakenHG_B7, box_krakenHG_allknown_B7, box_brakenHG_B7,
+                    box_kraken_B7, box_kraken_allknown_B7, box_braken_B7,
+                    box_meta_B7)
+
+box_B7_all$name_class <- factor(box_B7_all$name, levels = c("Kraken", "Kraken_allknown", "Braken", 
+                                                            "KrakenHG", "KrakenHG_allknown", "BrakenHG",
+                                                            "Meta"))
+
+p_box_B7_all <- box_B7_all %>% ggplot(aes(x=name, y=diversity_shannon)) +
+  geom_boxplot() +
+  geom_jitter(color="black", size=0.6, alpha=0.9)+
+  labs(title = "All data", caption = "shannon") +
+  xlab("B7")
+  theme(plot.title = element_text(size=11))
+print(p_box_B7_all)
+```
+
+
+##Top 10 taxa
+
+Example:
+```{r}
+### get top 10 genus
+physeq <- read_rds("PhySeq_BrakenHG_06.09.21.rds")
+# aggregating at a taxa level and getting the compositional normalization
+pseq_plot <- physeq %>%
+  aggregate_taxa(level = "genus") %>%  
+  microbiome::transform(transform = "compositional")
+
+# melting the object
+pmelt <- psmelt(pseq_plot)
+
+# average Taxa by time point
+av_pmelt <- pmelt %>% select(sample_type, OTU, Abundance) %>% 
+  group_by(sample_type, OTU) %>% mutate(av_abundance=mean(Abundance)) %>%
+  select(-Abundance) %>% unique() %>% ungroup()
+
+# get top 10 genus by time point
+top_pmelt <- av_pmelt %>% group_by(sample_type) %>% 
+  slice_max(order_by = av_abundance, n = 10)
+```
+
+Prepare
+note: in meta, use "genera"
+```{r}
+####################################typical############################################
+#kraken
+top_kraken_phy <- aggregate_taxa(PhySeq_Kraken_20.07.21,"genus") %>% subset_samples(!(sample_type %in% c("F","M"))) %>%
+  microbiome::transform(transform = "compositional")
+#kraken_allknown
+top_kraken_allknown_phy <- aggregate_taxa(PhySeq_Kraken_20.07.21,"genus") %>% subset_taxa(!(genus=="Unknown")) %>% 
+  subset_samples(!(sample_type %in% c("F","M"))) %>% microbiome::transform(transform = "compositional")
+#Braken
+top_braken_phy <- aggregate_taxa(PhySeq_Braken_20.07.21,"genus") %>% subset_samples(!(sample_type %in% c("F","M"))) %>%
+  microbiome::transform(transform = "compositional")
+#Metaphlan
+top_meta_phy <- aggregate_taxa(PhySeq_Metaphlan_20.07.21,"genera") %>% subset_samples(!(sample_type %in% c("F","M"))) %>%
+  microbiome::transform(transform = "compositional")
+
+#################################################HG###############################
+#kraken_HG
+top_krakenHG_phy <- aggregate_taxa(PhySeq_KrakenHG_06.09.21,"genus") %>% subset_samples(!(sample_type %in% c("F","M"))) %>%
+  microbiome::transform(transform = "compositional")
+#kraken_HG_allknown
+top_krakenHG_allknown_phy <- aggregate_taxa(PhySeq_KrakenHG_06.09.21,"genus") %>% subset_taxa(!(genus=="Unknown")) %>%
+  subset_samples(!(sample_type %in% c("F","M"))) %>% microbiome::transform(transform = "compositional")
+#Braken_HG
+top_brakenHG_phy <- aggregate_taxa(PhySeq_BrakenHG_06.09.21,"genus") %>% subset_samples(!(sample_type %in% c("F","M"))) %>%
+  microbiome::transform(transform = "compositional")
+```
+
+get top 10 by time point
+```{r}
+####################################typical############################################
+#kraken
+# melting the object
+kraken_melt <- psmelt(top_kraken_phy)
+# average Taxa by time point
+av_kraken_melt <- kraken_melt %>% select(sample_type, OTU, Abundance) %>%
+  group_by(sample_type, OTU) %>% mutate(av_abundance=mean(Abundance)) %>%
+  select(-Abundance) %>% unique() %>% ungroup()
+# get top 10 genus by time point
+top_kraken <- av_kraken_melt %>% group_by(sample_type) %>%
+  slice_max(order_by = av_abundance, n = 10)
+
+#kraken_allknown
+kraken_allknown_melt <- psmelt(top_kraken_allknown_phy)
+
+av_kraken_allknown_melt <- kraken_allknown_melt %>% select(sample_type, OTU, Abundance) %>%
+  group_by(sample_type, OTU) %>% mutate(av_abundance=mean(Abundance)) %>%
+  select(-Abundance) %>% unique() %>% ungroup()
+
+top_kraken_allknown <- av_kraken_allknown_melt %>% group_by(sample_type) %>%
+  slice_max(order_by = av_abundance, n = 10)
+
+#Braken
+braken_melt <- psmelt(top_braken_phy)
+
+av_braken_melt <- braken_melt %>% select(sample_type, OTU, Abundance) %>%
+  group_by(sample_type, OTU) %>% mutate(av_abundance=mean(Abundance)) %>%
+  select(-Abundance) %>% unique() %>% ungroup()
+
+top_braken <- av_braken_melt %>% group_by(sample_type) %>%
+  slice_max(order_by = av_abundance, n = 10)
+
+#Metaphlan
+meta_melt <- psmelt(top_meta_phy)
+
+av_meta_melt <- meta_melt %>% select(sample_type, OTU, Abundance) %>%
+  group_by(sample_type, OTU) %>% mutate(av_abundance=mean(Abundance)) %>%
+  select(-Abundance) %>% unique() %>% ungroup()
+
+top_meta <- av_meta_melt %>% group_by(sample_type) %>%
+  slice_max(order_by = av_abundance, n = 10)
+
+#################################################HG###############################
+#kraken_HG
+krakenHG_melt <- psmelt(top_krakenHG_phy)
+
+av_krakenHG_melt <- krakenHG_melt %>% select(sample_type, OTU, Abundance) %>%
+  group_by(sample_type, OTU) %>% mutate(av_abundance=mean(Abundance)) %>%
+  select(-Abundance) %>% unique() %>% ungroup()
+
+top_krakenHG <- av_krakenHG_melt %>% group_by(sample_type) %>%
+  slice_max(order_by = av_abundance, n = 10)
+
+#kraken_HG_allknown
+krakenHG_allknown_melt <- psmelt(top_krakenHG_allknown_phy)
+
+av_krakenHG_allknown_melt <- krakenHG_allknown_melt %>% select(sample_type, OTU, Abundance) %>%
+  group_by(sample_type, OTU) %>% mutate(av_abundance=mean(Abundance)) %>%
+  select(-Abundance) %>% unique() %>% ungroup()
+
+top_krakenHG_allknown <- av_krakenHG_allknown_melt %>% group_by(sample_type) %>%
+  slice_max(order_by = av_abundance, n = 10)
+
+#Braken_HG
+brakenHG_melt <- psmelt(top_brakenHG_phy)
+
+av_brakenHG_melt <- brakenHG_melt %>% select(sample_type, OTU, Abundance) %>%
+  group_by(sample_type, OTU) %>% mutate(av_abundance=mean(Abundance)) %>%
+  select(-Abundance) %>% unique() %>% ungroup()
+
+top_brakenHG <- av_brakenHG_melt %>% group_by(sample_type) %>%
+  slice_max(order_by = av_abundance, n = 10)
+```
+
+visualization
+```{r}
+##########################################typical#############################
+#kraken
+p_top_kraken <- top_kraken %>% data.frame() %>% ggplot(aes(fill=OTU, y=av_abundance, x=sample_type)) +
+  geom_bar(position = "fill", stat = "identity") +
+  labs(title = "Kraken",
+       subtitle = "aggregate by genus",
+       caption = "Top 10 taxa")
+
+print(p_top_kraken)
+
+#kraken_allknown
+p_top_kraken_allknown <- top_kraken_allknown %>% data.frame() %>% ggplot(aes(fill=OTU, y=av_abundance, x=sample_type)) +
+  geom_bar(position = "fill", stat = "identity") +
+  labs(title = "Kraken_allknown",
+       subtitle = "aggregate by genus",
+       caption = "Top 10 taxa")
+
+print(p_top_kraken_allknown)
+
+#braken
+p_top_braken <- top_braken %>% data.frame() %>% ggplot(aes(fill=OTU, y=av_abundance, x=sample_type)) +
+  geom_bar(position = "fill", stat = "identity") +
+  labs(title = "Braken",
+       subtitle = "aggregate by genus",
+       caption = "Top 10 taxa")
+
+print(p_top_braken)
+
+#meta
+p_top_meta <- top_meta %>% data.frame() %>% ggplot(aes(fill=OTU, y=av_abundance, x=sample_type)) +
+  geom_bar(position = "fill", stat = "identity") +
+  labs(title = "Meta",
+       subtitle = "aggregate by genus",
+       caption = "Top 10 taxa")
+
+print(p_top_meta)
+
+#####################################HG########################################
+#krakenHG
+p_top_krakenHG <- top_krakenHG %>% data.frame() %>% ggplot(aes(fill=OTU, y=av_abundance, x=sample_type)) +
+  geom_bar(position = "fill", stat = "identity") +
+  labs(title = "KrakenHG",
+       subtitle = "aggregate by genus",
+       caption = "Top 10 taxa")
+
+print(p_top_krakenHG)
+
+#krakenHG_allknown
+p_top_krakenHG_allknown <- top_krakenHG_allknown %>% data.frame() %>% ggplot(aes(fill=OTU, y=av_abundance, x=sample_type)) +
+  geom_bar(position = "fill", stat = "identity") +
+  labs(title = "KrakenHG_allknown",
+       subtitle = "aggregate by genus",
+       caption = "Top 10 taxa")
+
+print(p_top_krakenHG_allknown)
+
+#brakenHG
+p_top_brakenHG <- top_brakenHG %>% data.frame() %>% ggplot(aes(fill=OTU, y=av_abundance, x=sample_type)) +
+  geom_bar(position = "fill", stat = "identity") +
+  labs(title = "BrakenHG",
+       subtitle = "aggregate by genus",
+       caption = "Top 10 taxa")
+
+print(p_top_brakenHG)
+```
+
+
+One table for each phyloseq project with four colums(B1, B4, B5, B7)
+```{r}
+################################typical#####################################
+#kraken
+kraken_B1_phy <- PhySeq_Kraken_20.07.21 %>% subset_samples(sample_type=="B1")
+kraken_B1_top10_phy <- get_top_taxa(kraken_B1_phy, n=10, discard_other=T) %>% microbiome::transform(transform = "compositional")
+kraken_B1_table <- as.data.frame(tax_table(kraken_B1_top10_phy))
+
+kraken_B4_phy <- PhySeq_Kraken_20.07.21 %>% subset_samples(sample_type=="B4")
+kraken_B4_top10_phy <- get_top_taxa(kraken_B4_phy, n=10, discard_other=T) %>% microbiome::transform(transform = "compositional")
+kraken_B4_table <- as.data.frame(tax_table(kraken_B4_top10_phy))
+
+kraken_B5_phy <- PhySeq_Kraken_20.07.21 %>% subset_samples(sample_type=="B5")
+kraken_B5_top10_phy <- get_top_taxa(kraken_B5_phy, n=10, discard_other=T) %>% microbiome::transform(transform = "compositional")
+kraken_B5_table <- as.data.frame(tax_table(kraken_B5_top10_phy))
+
+kraken_B7_phy <- PhySeq_Kraken_20.07.21 %>% subset_samples(sample_type=="B7")
+kraken_B7_top10_phy <- get_top_taxa(kraken_B7_phy, n=10, discard_other=T) %>% microbiome::transform(transform = "compositional")
+kraken_B7_table <- as.data.frame(tax_table(kraken_B7_top10_phy))
+
+kaken_top_table <- data.frame(kraken_B1_table$genus, kraken_B4_table$genus, kraken_B5_table$genus, kraken_B7_table$genus)
+
+#braken
+braken_B1_phy <- PhySeq_Braken_20.07.21 %>% subset_samples(sample_type=="B1")
+braken_B1_top10_phy <- get_top_taxa(braken_B1_phy, n=10, discard_other=T) %>% microbiome::transform(transform = "compositional")
+braken_B1_table <- as.data.frame(tax_table(braken_B1_top10_phy))
+
+braken_B4_phy <- PhySeq_Braken_20.07.21 %>% subset_samples(sample_type=="B4")
+braken_B4_top10_phy <- get_top_taxa(braken_B4_phy, n=10, discard_other=T) %>% microbiome::transform(transform = "compositional")
+braken_B4_table <- as.data.frame(tax_table(braken_B4_top10_phy))
+
+braken_B5_phy <- PhySeq_Braken_20.07.21 %>% subset_samples(sample_type=="B5")
+braken_B5_top10_phy <- get_top_taxa(braken_B5_phy, n=10, discard_other=T) %>% microbiome::transform(transform = "compositional")
+braken_B5_table <- as.data.frame(tax_table(braken_B5_top10_phy))
+
+braken_B7_phy <- PhySeq_Braken_20.07.21 %>% subset_samples(sample_type=="B7")
+braken_B7_top10_phy <- get_top_taxa(braken_B7_phy, n=10, discard_other=T) %>% microbiome::transform(transform = "compositional")
+braken_B7_table <- as.data.frame(tax_table(braken_B7_top10_phy))
+
+braken_top_table <- data.frame(braken_B1_table$genus, braken_B4_table$genus, braken_B5_table$genus, braken_B7_table$genus)
+
+#meta
+meta_B1_phy <- PhySeq_Metaphlan_20.07.21 %>% subset_samples(sample_type=="B1")
+meta_B1_top10_phy <- get_top_taxa(meta_B1_phy, n=10, discard_other=T) %>% microbiome::transform(transform = "compositional")
+meta_B1_table <- as.data.frame(tax_table(meta_B1_top10_phy))
+
+meta_B4_phy <- PhySeq_Metaphlan_20.07.21 %>% subset_samples(sample_type=="B4")
+meta_B4_top10_phy <- get_top_taxa(meta_B4_phy, n=10, discard_other=T) %>% microbiome::transform(transform = "compositional")
+meta_B4_table <- as.data.frame(tax_table(meta_B4_top10_phy))
+
+meta_B5_phy <- PhySeq_Metaphlan_20.07.21 %>% subset_samples(sample_type=="B5")
+meta_B5_top10_phy <- get_top_taxa(meta_B5_phy, n=10, discard_other=T) %>% microbiome::transform(transform = "compositional")
+meta_B5_table <- as.data.frame(tax_table(meta_B5_top10_phy))
+
+meta_B7_phy <- PhySeq_Metaphlan_20.07.21 %>% subset_samples(sample_type=="B7")
+meta_B7_top10_phy <- get_top_taxa(meta_B7_phy, n=10, discard_other=T) %>% microbiome::transform(transform = "compositional")
+meta_B7_table <- as.data.frame(tax_table(meta_B7_top10_phy))
+
+meta_top_table <- data.frame(meta_B1_table$genera, meta_B4_table$genus, meta_B5_table$genus, meta_B7_table$genus)
+
+##################################HG#####################################3
+#krakenHG
+krakenHG_B1_phy <- PhySeq_KrakenHG_06.09.21 %>% subset_samples(sample_type=="B1")
+krakenHG_B1_top10_phy <- get_top_taxa(krakenHG_B1_phy, n=10, discard_other=T) %>% microbiome::transform(transform = "compositional")
+krakenHG_B1_table <- as.data.frame(tax_table(krakenHG_B1_top10_phy))
+
+krakenHG_B4_phy <- PhySeq_KrakenHG_06.09.21 %>% subset_samples(sample_type=="B4")
+krakenHG_B4_top10_phy <- get_top_taxa(krakenHG_B4_phy, n=10, discard_other=T) %>% microbiome::transform(transform = "compositional")
+krakenHG_B4_table <- as.data.frame(tax_table(krakenHG_B4_top10_phy))
+
+krakenHG_B5_phy <- PhySeq_KrakenHG_06.09.21 %>% subset_samples(sample_type=="B5")
+krakenHG_B5_top10_phy <- get_top_taxa(krakenHG_B5_phy, n=10, discard_other=T) %>% microbiome::transform(transform = "compositional")
+krakenHG_B5_table <- as.data.frame(tax_table(krakenHG_B5_top10_phy))
+
+krakenHG_B7_phy <- PhySeq_KrakenHG_06.09.21 %>% subset_samples(sample_type=="B7")
+krakenHG_B7_top10_phy <- get_top_taxa(krakenHG_B7_phy, n=10, discard_other=T) %>% microbiome::transform(transform = "compositional")
+krakenHG_B7_table <- as.data.frame(tax_table(krakenHG_B7_top10_phy))
+
+krakenHG_top_table <- data.frame(krakenHG_B1_table$genus, krakenHG_B4_table$genus, krakenHG_B5_table$genus, krakenHG_B7_table$genus)
+
+#brakenHG
+brakenHG_B1_phy <- PhySeq_BrakenHG_06.09.21 %>% subset_samples(sample_type=="B1")
+brakenHG_B1_top10_phy <- get_top_taxa(brakenHG_B1_phy, n=10, discard_other=T) %>% microbiome::transform(transform = "compositional")
+brakenHG_B1_table <- as.data.frame(tax_table(brakenHG_B1_top10_phy))
+
+brakenHG_B4_phy <- PhySeq_BrakenHG_06.09.21 %>% subset_samples(sample_type=="B4")
+brakenHG_B4_top10_phy <- get_top_taxa(brakenHG_B4_phy, n=10, discard_other=T) %>% microbiome::transform(transform = "compositional")
+brakenHG_B4_table <- as.data.frame(tax_table(brakenHG_B4_top10_phy))
+
+brakenHG_B5_phy <- PhySeq_BrakenHG_06.09.21 %>% subset_samples(sample_type=="B5")
+brakenHG_B5_top10_phy <- get_top_taxa(brakenHG_B5_phy, n=10, discard_other=T) %>% microbiome::transform(transform = "compositional")
+brakenHG_B5_table <- as.data.frame(tax_table(brakenHG_B5_top10_phy))
+
+brakenHG_B7_phy <- PhySeq_BrakenHG_06.09.21 %>% subset_samples(sample_type=="B7")
+brakenHG_B7_top10_phy <- get_top_taxa(brakenHG_B7_phy, n=10, discard_other=T) %>% microbiome::transform(transform = "compositional")
+brakenHG_B7_table <- as.data.frame(tax_table(brakenHG_B7_top10_phy))
+
+brakenHG_top_table <- data.frame(brakenHG_B1_table$genus, brakenHG_B4_table$genus, brakenHG_B5_table$genus, brakenHG_B7_table$genus)
+```
+
