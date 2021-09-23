@@ -1,0 +1,126 @@
+---
+title: "Compare-composition"
+output: html_notebook
+---
+#Part 1 Microbiome composition
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+library(phyloseq)
+library(tidyverse)
+library(dplyr)
+library(microbiome)
+library(hrbrthemes)
+```
+Three phyloseq projects from three tools:
+PhySeq_Kraken_20.07.21.rds
+PhySeq_Braken_20.07.21.rds
+PhySeq_Metaphlan_20.07.21.rds
+```{r}
+PhySeq_Kraken_20.07.21 <- readRDS("Kraken/PhySeq_Kraken_20.07.21.rds")
+PhySeq_Braken_20.07.21 <- readRDS("Kraken-Braken/PhySeq_Braken_20.07.21.rds")
+PhySeq_Metaphlan_20.07.21 <- readRDS("Metaphlan3/PhySeq_Metaphlan_20.07.21.rds")
+```
+
+Aggreagre by phylum
+extract infant samples
+
+note: the word "phylum" in kraken & braken is "phylum", while in Metaphlan it is the capital "P" ("Phylum)
+```{r}
+#kraken
+aggre_kraken_phy <- aggregate_taxa(PhySeq_Kraken_20.07.21,"phylum") %>% aggregate_rare(level = "phylum", detection = 0.1/100, prevalence = 1/100) %>% subset_taxa(!(phylum=="Unknown"))
+infant_aggre_kraken_phy <- subset_samples(aggre_kraken_phy, !(sample_type %in% c("F","M"))) %>% microbiome::transform(transform = "compositional")
+#Braken
+aggre_braken_phy <- aggregate_taxa(PhySeq_Braken_20.07.21,"phylum") %>% aggregate_rare(level = "phylum", detection = 0.1/100, prevalence = 1/100)
+infant_aggre_braken_phy <- subset_samples(aggre_braken_phy, !(sample_type %in% c("F","M"))) %>% microbiome::transform(transform = "compositional")
+#Metaphlan
+aggre_meta_phy <- aggregate_taxa(PhySeq_Metaphlan_20.07.21,"Phylum") %>% aggregate_rare(level = "Phylum", detection = 0.1/100, prevalence = 1/100)
+infant_aggre_meta_phy <- subset_samples(aggre_meta_phy, !(sample_type %in% c("F","M"))) %>% microbiome::transform(transform = "compositional")
+```
+Barplot
+```{r}
+#kraken
+p_infant_aggre_kraken <- plot_composition(infant_aggre_kraken_phy,
+              taxonomic.level = "phylum",
+                      sample.sort = "sample_type",
+                      x.label = "sample_type") +
+     guides(fill = guide_legend(ncol = 1)) +
+     scale_y_percent() +
+  
+  
+     labs(x = "sample_type", y = "Relative abundance (%)",
+                                   title = "Relative abundance data",
+                                  subtitle = "Kraken",
+                                  caption = "infant_data,aggregated on phylum")
+print(p_infant_aggre_kraken)
+
+#braken
+p_infant_aggre_braken <- plot_composition(infant_aggre_braken_phy,
+              taxonomic.level = "phylum",
+                      sample.sort = "sample_type",
+                      x.label = "sample_type") +
+     guides(fill = guide_legend(ncol = 1)) +
+     scale_y_percent() +
+  
+  
+     labs(x = "sample_type", y = "Relative abundance (%)",
+                                   title = "Relative abundance data",
+                                  subtitle = "Braken",
+                                  caption = "infant_data,aggregated on phylum")
+print(p_infant_aggre_braken)
+
+#Meta
+p_infant_aggre_meta <- plot_composition(infant_aggre_meta_phy,
+              taxonomic.level = "Phylum",
+                      sample.sort = "sample_type",
+                      x.label = "sample_type") +
+     guides(fill = guide_legend(ncol = 1)) +
+     scale_y_percent() +
+  
+  
+     labs(x = "sample_type", y = "Relative abundance (%)",
+                                   title = "Relative abundance data",
+                                  subtitle = "Metaphlan",
+                                  caption = "infant_data,aggregated on phylum")
+print(p_infant_aggre_meta)
+```
+
+Averaged by group
+```{r}
+#kraken
+sample_data(infant_aggre_kraken_phy)$sample_type_factor <- sample_data(infant_aggre_kraken_phy)$sample_type %>% as.factor()
+p_aver_infant_aggre_kraken <- plot_composition(infant_aggre_kraken_phy,
+                      average_by = "sample_type_factor", transform = "compositional")+
+  
+  
+     labs(x = "sample_type", y = "Abundance",
+                                   title = "Averaged by sample_type",
+                                  subtitle = "Kraken",
+                                  caption = "infant_data,aggregated on phylum")
+print(p_aver_infant_aggre_kraken)
+
+#braken
+sample_data(infant_aggre_braken_phy)$sample_type_factor <- sample_data(infant_aggre_braken_phy)$sample_type %>% as.factor()
+p_aver_infant_aggre_braken <- plot_composition(infant_aggre_braken_phy,
+                      average_by = "sample_type_factor", transform = "compositional")+
+  
+  
+     labs(x = "sample_type", y = "Abundance",
+                                   title = "Averaged by sample_type",
+                                  subtitle = "Braken",
+                                  caption = "infant_data,aggregated on phylum")
+print(p_aver_infant_aggre_braken)
+
+
+#meta
+sample_data(infant_aggre_meta_phy)$sample_type_factor <- sample_data(infant_aggre_meta_phy)$sample_type %>% as.factor()
+p_aver_infant_aggre_meta <- plot_composition(infant_aggre_meta_phy,
+                      average_by = "sample_type_factor", transform = "compositional")+
+  
+  
+     labs(x = "sample_type", y = "Abundance",
+                                   title = "Averaged by sample_type",
+                                  subtitle = "Metaphlan",
+                                  caption = "infant_data,aggregated on phylum")
+print(p_aver_infant_aggre_meta)
+```
+
