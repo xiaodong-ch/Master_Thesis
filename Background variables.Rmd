@@ -1,0 +1,73 @@
+---
+title: "Background variables"
+output: html_notebook
+---
+This notebook will have an overview of Background variables
+
+File names (The number stands for the variable number in each .csv, not including famID):
+vocabulary.csv
+WGS_Background_all_v1.csv  134
+WGS_Background_baby_V1_14.07.21.csv  38
+WGS_Background_environment_V1_14.07.21.csv  19
+WGS_Background_family_V1_14.07.21.csv  10
+WGS_Background_father_V1_14.07.21.csv  20
+WGS_Background_mother_V1_14.07.21.csv  44
+WGS_Background_partner_V1_14.07.21.csv  3
+total 134
+
+Some basic info:
+Family number: 90
+Type: ID 1
+      categorical 29
+      Bool 79
+      int 24
+      total 133
+      
+```{r message=FALSE, warning=FALSE, include=FALSE}
+library(phyloseq)
+library(tidyverse)
+library(dplyr)
+library(microbiome)
+library(hrbrthemes)
+library(knitr)
+library(viridis)
+```
+
+Load files
+```{r}
+vocabulary <- read.csv("vocabulary.csv") #note: somehow the original vocabulary.csv have some error: the name of the first column will turn to garbled code.
+#You need to use "save as" function in "file" to resave it as .csv
+#Here the "vocabulary.csv" is the new one and I deleted the original one.
+WGS_Background_all <- read.csv("WGS_Background_all_v1.csv")
+```
+
+There seems something wrong with the number of variables between vocabulary(133 include famID) and WB_all(135 include famID)
+Let's find out the variables not in vocabulary
+```{r}
+var_vocab <- vocabulary %>% select(Variable) %>% pull()
+var_all <- WGS_Background_all %>% names()
+
+for (item in var_all) {
+  if (!(item %in% var_vocab)) {
+    print(item)
+  }
+}
+```
+
+Despite them, we can still output the overview
+```{r}
+#First, the Bool
+var_bool <- vocabulary %>% filter(Type=="Bool") %>% select(Variable) %>% pull()
+
+WB_all_bool <- WGS_Background_all %>% select(Family_ID, any_of(var_bool))
+WB_all_bool_long <- WB_all_bool %>% pivot_longer(!Family_ID, names_to = "question", values_to = "answers")
+WB_all_bool_counts <- WB_all_bool_long %>% group_by(question, answers) %>% tally()
+
+p_all_bool <- WB_all_bool_counts %>% ggplot(aes(x=question, y=n, fill=answers)) +
+  geom_bar(stat = "identity") +
+  coord_flip() +
+  theme(legend.position = "bottom",
+        text=element_text(size=10))
+p_all_bool
+```
+
