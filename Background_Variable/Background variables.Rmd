@@ -33,6 +33,10 @@ library(knitr)
 library(viridis)
 ```
 
+#Data valid test
+The code below is not longer need to run.
+skip to #Data explore part.
+
 Load files
 ```{r}
 vocabulary <- read.csv("vocabulary.csv") #note: somehow the original vocabulary.csv have some error: the name of the first column will turn to garbled code.
@@ -54,20 +58,116 @@ for (item in var_all) {
 }
 ```
 
+
 Despite them, we can still output the overview
 ```{r}
-#First, the Bool
-var_bool <- vocabulary %>% filter(Type=="Bool") %>% select(Variable) %>% pull()
+#First, the categorical
+var_categ <- vocabulary %>% filter(Type=="categorical") %>% select(Variable) %>% pull()
 
-WB_all_bool <- WGS_Background_all %>% select(Family_ID, any_of(var_bool))
-WB_all_bool_long <- WB_all_bool %>% pivot_longer(!Family_ID, names_to = "question", values_to = "answers")
-WB_all_bool_counts <- WB_all_bool_long %>% group_by(question, answers) %>% tally()
+WB_all_categ <- WGS_Background_all %>% select(Family_ID, any_of(var_categ))
+WB_all_categ_long <- WB_all_categ %>% pivot_longer(!Family_ID, names_to = "question", values_to = "answers")
+WB_all_categ_counts <- WB_all_categ_long %>% group_by(question, answers) %>% tally()
 
-p_all_bool <- WB_all_bool_counts %>% ggplot(aes(x=question, y=n, fill=answers)) +
+p_all_categ <- WB_all_categ_counts %>% ggplot(aes(x=question, y=n, fill=answers)) +
   geom_bar(stat = "identity") +
   coord_flip() +
   theme(legend.position = "bottom",
         text=element_text(size=10))
-p_all_bool
+p_all_categ
+
+#And the Bool
+var_Bool <- vocabulary %>% filter(Type=="Bool") %>% select(Variable) %>% pull()
+
+WB_all_Bool <- WGS_Background_all %>% select(Family_ID, any_of(var_Bool)) #%>% select(!c(inf_Gestational_ageW,reg_WaterBreakH))
+WB_all_Bool <-  data.frame(lapply(WB_all_Bool, as.character))
+WB_all_Bool_long <- WB_all_Bool %>% pivot_longer(!Family_ID, names_to = "question", values_to = "answers")
+WB_all_Bool_counts <- WB_all_Bool_long %>% group_by(question, answers) %>% tally()
+WB_all_Bool_counts <- WB_all_Bool_counts %>% filter(answers %in% c("TRUE", "FALSE") | is.na(answers))
+
+p_all_Bool <- WB_all_Bool_counts %>% ggplot(aes(x=question, y=n, fill=answers)) +
+  geom_bar(stat = "identity") +
+  coord_flip() +
+  theme(legend.position = "bottom",
+        text=element_text(size=10))
+p_all_Bool
 ```
 
+
+
+Something weird here. some variable like f_HadAllergyDisease should be categorical variable containing Yes and No,
+yet was noted as bool
+and other boolean variable such as inf_Gestational_ageW should be int.
+
+The vocabulary.csv should be corrected.
+Some boolean variables filled with Yes/No are transfered into TRUE/FALSE.
+
+#Data explore
+Now let's redo the steps above to take an overview
+
+Load files
+```{r}
+vocabulary <- read.csv("vocabulary.csv")
+WGS_Background_all <- read.csv("WGS_Background_all_v1.csv")
+```
+
+Overview of cata and bool variables
+```{r}
+#First, the categorical
+var_categ <- vocabulary %>% filter(Type=="categorical") %>% select(Variable) %>% pull()
+
+WB_all_categ <- WGS_Background_all %>% select(Family_ID, any_of(var_categ))
+WB_all_categ <- data.frame(lapply(WB_all_categ, as.character))
+WB_all_categ_long <- WB_all_categ %>% pivot_longer(!Family_ID, names_to = "question", values_to = "answers")
+WB_all_categ_counts <- WB_all_categ_long %>% group_by(question, answers) %>% tally()
+
+p_all_categ <- WB_all_categ_counts %>% ggplot(aes(x=question, y=n, fill=answers)) +
+  geom_bar(stat = "identity") +
+  coord_flip() +
+  theme(legend.position = "bottom",
+        text=element_text(size=10))
+p_all_categ
+```
+
+
+```{r}
+#And the Bool
+var_Bool <- vocabulary %>% filter(Type=="Bool") %>% select(Variable) %>% pull()
+
+WB_all_Bool <- WGS_Background_all %>% select(Family_ID, any_of(var_Bool))
+WB_all_Bool <-  data.frame(lapply(WB_all_Bool, as.character))
+WB_all_Bool_long <- WB_all_Bool %>% pivot_longer(!Family_ID, names_to = "question", values_to = "answers")
+WB_all_Bool_counts <- WB_all_Bool_long %>% group_by(question, answers) %>% tally()
+WB_all_Bool_counts <- WB_all_Bool_counts %>% filter(answers %in% c("TRUE", "FALSE") | is.na(answers))
+
+p_all_Bool <- WB_all_Bool_counts %>% ggplot(aes(x=question, y=n, fill=answers)) +
+  geom_bar(stat = "identity") +
+  coord_flip() +
+  theme(legend.position = "bottom",
+        text=element_text(size=10))
+p_all_Bool
+```
+
+Some boolean variables only contain FALSE & NA, which is not needed for later analysis.
+These varibales are:
+```{r}
+num_useless=0
+ul_bool <- c()
+for (item in var_Bool) {
+  var_T <- WGS_Background_all %>% select(item)
+  if (any(var_T, na.rm=T) == F) {
+    print(item)
+    num_useless = num_useless+1
+    ul_bool <- c(ul_bool, item)
+  }
+}
+cat("Useless variables number:", num_useless)
+```
+
+We can drop these variables and export the new vocabulary file
+```{r}
+newvoca <- vocabulary %>% filter(!(Variable %in% ul_bool))
+write.csv(newvoca, file = "E:/UniversityofHelsinki/StudyinHelsinki/Master's Thesis/Background Variable/newvocabulary.csv", 
+          row.names = F)
+```
+
+Now we have 125 variables ready for following analysis
