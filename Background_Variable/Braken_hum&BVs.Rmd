@@ -1,0 +1,320 @@
+---
+title: "Braken & background variables"
+output: html_notebook
+---
+This notebook are expected to generate phyloseq project with Braken_hum data and background variables
+Then PERMANOVA will be applied to analysis the data.
+Roosa'scripts as reference
+BVs = Background Variables
+
+#1. Generate the phyloseq data
+
+```{r warning=FALSE, include=FALSE}
+library(phyloseq)
+library(tidyverse)
+library(dplyr)
+library(microbiome)
+library(hrbrthemes)
+library(knitr)
+library(viridis)
+library(RVAideMemoire)
+library(vegan)
+```
+
+
+read in data:
+```{r}
+vocabulary <- read.csv("../Background Variable/newvocabulary.csv")
+WGS_Background_all <- read.csv("../Background Variable/WGS_Background_all_v1.csv")
+braken_sample <- read.csv("../WGS/Braken-HumGut/sample_selection_metadata_06.09.2021.csv")
+otu <- read.csv("../WGS/Braken-HumGut/count_table_brakenHG_selection_06.09.2021.csv")
+taxa <- read.csv("../WGS/Braken-HumGut/taxonomy_brakenHG_06.09.2021.csv")
+```
+
+In this notebook, we focus on the infant samples and relevant BVs first
+```{r}
+#infant samples
+braken_infant_sample <- braken_sample %>% filter(!(sample_type %in% c("F", "M")))
+
+sample <- braken_infant_sample %>% left_join(WGS_Background_all, by = "Family_ID") %>% 
+                            column_to_rownames("sample_ID")
+
+```
+
+Now we are ready for the phyloseq project
+```{r}
+TAX = tax_table(as.matrix(taxa))
+OTU = otu_table(as.matrix(otu), taxa_are_rows = TRUE)
+SAMPLE = sample_data(as.data.frame(sample))
+
+phy <- phyloseq(OTU, TAX, SAMPLE)
+```
+
+#2. Primary exploration
+
+```{r}
+#Before further opperation, aggregate at species level
+iphy <- phy %>% aggregate_taxa("species") %>% 
+                aggregate_rare(level = "species", detection = 0.1/100, prevalence = 1/100) %>%
+                subset_taxa(!(species=="Unknown")) #drop the unknown group
+
+iphy <- iphy %>% microbiome::transform(transform = "compositional")
+
+saveRDS(iphy, "Braken_hum&BVs_01.11.21.rds")
+```
+
+The following codes come from Roosa
+Let's try to make it work first
+
+step1. loop through variables and time points and collect the data to a data frame
+```{r}
+list_adonis <- list()
+counter <- 0
+list_beta <- list()
+
+for (age in unique(sample$sample_type)) {
+  
+  for (variable in colnames(sample)) {
+    counter = counter + 1
+    
+    curr_meta <- iphy %>% subset_samples(sample_type == age) %>%
+                          sample_data() %>%
+                          as("data.frame")
+    samples <- rownames(curr_meta[!is.na(curr_meta[variable]),])
+    curr_meta <- curr_meta[rownames(curr_meta) %in% samples,]
+    ##These two steps together drop the na rows within the "variable" column
+    if (nrow(unique(curr_meta[variable])) > 1) {
+      
+      curr_asv <- iphy %>%
+        subset_samples(sample_type == age) %>%
+        otu_table()
+      
+      curr_asv <- curr_asv[,colnames(curr_asv) %in% samples] ##drop those sampleIDs with na in sample table
+      curr_dist <- curr_asv[rowSums(curr_asv) != 0,] %>%
+        t() %>%
+        vegdist(method = "bray") ##give the distance between two different sample group
+                                ##Bray-Crutis distance: 0--identical micro-composition
+                                ##                      1--totally different micro-composition
+      
+      current_ado <- adonis(as.formula(paste("curr_dist ~ ", variable, sep = )), curr_meta) 
+      current_res <- as.data.frame(current_ado$aov.tab[variable, 1:6])
+      current_res$sample_type <- age
+      current_res$variable <- variable
+      current_res$fdr <- p.adjust(current_res$`Pr(>F)`, method = "fdr")
+      list_adonis[[counter]] <- current_res
+        
+      ## betadispersion 
+      m_beta=betadisper(curr_dist, curr_meta[,variable])
+      m_beta
+      list_beta[[counter]] <- anova(m_beta)
+    } else {
+      next
+    }
+  }
+}
+
+all_adonis <- do.call(rbind, list_adonis)
+```
+
+The betadispersion table
+```{r}
+list_beta_df <- data.frame()
+for (i in 1:length(list_beta)) {
+  if (length(list_beta[[i]]) == 0) {
+    list_beta_df[nrow(list_beta_df) + 1,] <- NA
+    # list_beta_df$variable[nrow(list_beta_df) + 1] <- as.data.frame(list_adonis[i])["variable"]
+    # list_beta_df$sample_type[nrow(list_beta_df) + 1] <- as.data.frame(list_adonis[i])["sample_type"]
+    
+  } else {
+    current_beta <- as.data.frame(list_beta[i])["Groups", 1:5]
+    current_beta <- as.data.frame(cbind(current_beta, 
+                                        as.data.frame(list_adonis[i])[c("sample_type", "variable")]))
+    if (length(list_beta_df) == 0) {
+      list_beta_df <- current_beta
+    } else {
+      list_beta_df[nrow(list_beta_df) + 1,] <- current_beta
+    }
+  }
+}
+
+
+write_csv(all_adonis, "adonis_backgound2021-07-20.csv")
+write_csv(list_beta_df, "betadispersion2021-07-20.csv")
+```
+
+
+step2. Plot significant variables with non-significant betadispersion
+
+For memory reasons, some variables can be removed
+```{r}
+rm(asv, taxa, sample, infant, envir, family, father, mother, partner)
+gc()
+```
+
+If run earlier, read in here:
+```{r message=FALSE, warning=FALSE, include=FALSE}
+all_adonis <- read_csv("adonis_backgound2021-07-20.csv")
+list_beta_df <- read_csv("betadispersion2021-07-20.csv")
+iphy <- read_rds("Braken_hum&BVs_01.11.21.rds")
+```
+
+prepare
+```{r}
+# select only significant variables
+all_adonis <- na.omit(all_adonis) # remove the rows were p-values were not calculated
+sig_adonis <- all_adonis[all_adonis$`Pr(>F)` < 0.05,]
+
+# select only variables with non significant beta dispersion
+betadisp <- list_beta_df[!is.na(list_beta_df$variable),]
+
+sig_adonis$betadispersion <- NA
+```
+
+
+loop to add the status of betadispersion in adonis
+```{r}
+for (variable in unique(sig_adonis$variable)) {
+  for (age in unique(sig_adonis$sample_type)) {
+    if (nrow(sig_adonis[sig_adonis$variable == variable &
+                        sig_adonis$sample_type == age,]) > 0) {
+      
+      #sign status in sig_adonis according to the Pr..F. value
+      beta_status <- betadisp[betadisp$variable == variable &
+                              betadisp$sample_type == age,]$Pr..F.
+      if (is.na(beta_status)) {
+        sig_adonis[sig_adonis$variable == variable &
+                     sig_adonis$sample_type == age,]$betadispersion <- NA
+      } else if (beta_status < 0.05) {
+        sig_adonis[sig_adonis$variable == variable &
+                     sig_adonis$sample_type == age,]$betadispersion <- TRUE
+      } else {
+        sig_adonis[sig_adonis$variable == variable &
+                     sig_adonis$sample_type == age,]$betadispersion <- FALSE
+      }
+    }
+  }
+}
+```
+
+
+Step3 Plot
+```{r}
+
+# plot dispersions in flagged variables
+
+# plot sig variables heatmap?
+
+plot_list <- list()
+counter <- 0
+
+for (variable in unique(sig_adonis$variable)) {
+  for (age in unique(sig_adonis$sample_type)) {
+    if (nrow(sig_adonis[sig_adonis$variable == variable &
+                        sig_adonis$sample_type == age,]) > 0) {
+      sig_status <- sig_adonis[sig_adonis$variable == variable &
+                               sig_adonis$sample_type == age,]$betadispersion
+      if (is.na(sig_status)) {
+        break
+      }
+      if (sig_status) {
+        counter <- counter + 1
+        curr_meta <- iphy %>%
+          subset_samples(sample_type == age) %>%
+          sample_data() %>%
+          as("data.frame")
+        samples <- rownames(curr_meta[!is.na(curr_meta[variable]),])
+        curr_meta <- curr_meta[rownames(curr_meta) %in% samples,]
+        # leave out variables with over 10 levels
+        if (nrow(unique(curr_meta[variable])) > 10) {
+          break
+        } else {
+          
+          curr_asv <- iphy %>%
+            subset_samples(sample_type == age) %>%
+            microbiome::transform(transform = "compositional") %>%
+            otu_table()
+          
+          curr_asv <- curr_asv[,colnames(curr_asv) %in% samples]
+          curr_dist <- curr_asv[rowSums(curr_asv) != 0,] %>%
+            t() %>%
+            vegdist(method = "bray")
+          m_beta=betadisper(curr_dist, curr_meta[,variable])
+          
+          curr_plot <- plot(m_beta, main = paste(age, variable, sep = " "))
+          plot_list[[counter]] <- curr_plot
+          #print(plot(m_beta, main = paste(age, variable, sep = " ")))
+          png(file = paste("plot/", age, variable, ".png", seq = " "))
+          plot(m_beta, main = paste(age, variable, sep = " "))
+          dev.off()
+        }
+      }
+    }
+  }
+}
+```
+
+
+
+
+Step4 Pairwise comparisons
+```{r}
+pair_ado <- list()
+
+for (variable in unique(sig_adonis$variable)) {
+  for (age in unique(sig_adonis$sample_type)) {
+    if (nrow(sig_adonis[sig_adonis$variable == variable &
+                        sig_adonis$sample_type == age,]) > 0) {
+      
+      curr_meta <- iphy %>% subset_samples(sample_type == age) %>%
+                            sample_data() %>%
+                            as("data.frame")
+      
+      if (variable %in% colnames(curr_meta)) {
+        if (length(unique(curr_meta[,variable])) > 10 |
+            length(unique(na.omit(curr_meta[,variable]))) == 2) {
+          next
+        } else {
+          samples <- rownames(curr_meta[!is.na(curr_meta[variable]),])
+          curr_meta <- curr_meta[rownames(curr_meta) %in% samples,]
+          
+          curr_asv <- iphy %>% subset_samples(sample_type == age) %>%
+                               microbiome::transform(transform = "compositional") %>%
+                               otu_table()
+          
+          curr_asv <- curr_asv[,colnames(curr_asv) %in% samples]
+          curr_dist <- curr_asv[rowSums(curr_asv) != 0,] %>%
+            t() %>%
+            vegdist(method = "bray")
+          result <- pairwise.perm.manova(curr_dist, curr_meta[,variable], test = "Pillai", nperm = 9999, 
+                                         progress = TRUE, p.method = "fdr")
+          print(result)
+          temp_df <- as.data.frame(result$p.value)
+          p_df <- expand.grid(as.vector(dimnames(result$p.value)[1][[1]]),
+                              as.vector(dimnames(result$p.value)[2][[1]]))
+          # Collect all the p-values to the data frame
+          p_list <- vector()
+          for(col in colnames(temp_df)) {
+            p_list <- c(p_list, temp_df[[col]])
+          }
+          p_df$pval <- p_list
+          p_df$variable <- variable
+          p_df$timepoint <- age
+          # save to list
+          pair_ado[[paste(age, variable)]] <- p_df
+        }
+      }
+    }
+  }
+}
+
+```
+
+
+
+Step4 collect all result
+```{r}
+all_pair_adonis <- do.call(rbind, pair_ado)
+
+write_csv(all_pair_adonis, "pairwise_2021-10-04.csv")
+```
+
