@@ -1,0 +1,58 @@
+---
+title: "Ext_DNAconc"
+output: html_notebook
+---
+explore the distribution of DNAconc to find if there is any outliers
+
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+library(phyloseq)
+library(tidyverse)
+library(hrbrthemes)
+library(viridis)
+library(forcats)
+library(ggplot2)
+```
+
+Load files
+```{r message=FALSE, warning=FALSE, include=FALSE}
+baby_data <- read_csv("WGS_technicalVariables_baby_20.10.21.csv", guess_max = 9000)
+parent_data <- read_csv("WGS_technicalVariables_parents_20.10.21.csv", guess_max = 9000)
+
+```
+
+Data prepare
+```{r}
+baby_cate <- baby_data %>% select(c("sample_ID", "Sample_type", "Ext_DNAconc"))
+parent_cate <- parent_data %>% select(c("sample_ID", "Sample_type", "Ext_DNAconc"))
+cate_conc <- bind_rows(baby_cate, parent_cate)
+```
+
+
+Histogram plot
+```{r}
+cate_1 <- cate_conc %>%   select(c("Sample_type", "Ext_DNAconc"))
+
+p <- cate_1 %>% 
+  ggplot( aes(x=Ext_DNAconc, fill=Sample_type, color=Sample_type)) +
+    geom_histogram(alpha=0.6, ) +
+    scale_fill_viridis(discrete = T) +
+    scale_color_viridis(discrete = T) +
+    theme(
+      legend.position = "none",
+      panel.spacing = unit(0.3, "lines"),
+      strip.text.x = element_text(size=10)
+    ) +
+    xlab("Ext_DNAconc") +
+    facet_wrap(~Sample_type)
+plot(p)
+```
+
+```{r}
+data <- read.table("https://raw.githubusercontent.com/zonination/perceptions/master/probly.csv", header=TRUE, sep=",")
+data <- data %>%
+  gather(key="text", value="value") %>%
+  mutate(text = gsub("\\.", " ",text)) %>%
+  mutate(value = round(as.numeric(value),0))
+```
+
