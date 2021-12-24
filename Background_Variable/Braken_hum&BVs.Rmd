@@ -60,7 +60,7 @@ iphy <- phy %>% aggregate_taxa("species") %>%
 
 iphy <- iphy %>% microbiome::transform(transform = "compositional")
 
-saveRDS(iphy, "Braken_hum&BVs_01.11.21.rds")
+#saveRDS(iphy, "Braken_hum&BVs-2021-11-01.rds")
 ```
 
 The following codes come from Roosa
@@ -100,7 +100,7 @@ for (age in unique(sample$sample_type)) {
       current_res <- as.data.frame(current_ado$aov.tab[variable, 1:6])
       current_res$sample_type <- age
       current_res$variable <- variable
-      current_res$fdr <- p.adjust(current_res$`Pr(>F)`, method = "fdr")
+      #current_res$fdr <- p.adjust(current_res$`Pr(>F)`, method = "fdr")
       list_adonis[[counter]] <- current_res
         
       ## betadispersion 
@@ -114,6 +114,7 @@ for (age in unique(sample$sample_type)) {
 }
 
 all_adonis <- do.call(rbind, list_adonis)
+all_adonis$fdr <- p.adjust(all_adonis$`Pr(>F)`, method = "fdr")
 ```
 
 The betadispersion table
@@ -138,8 +139,8 @@ for (i in 1:length(list_beta)) {
 }
 
 
-write_csv(all_adonis, "adonis_backgound2021-07-20.csv")
-write_csv(list_beta_df, "betadispersion2021-07-20.csv")
+write_csv(all_adonis, "adonis_backgound_padjusted-2021-12-01.csv")
+write_csv(list_beta_df, "betadispersion_padjusted-2021-12-01.csv")
 ```
 
 
@@ -153,9 +154,9 @@ gc()
 
 If run earlier, read in here:
 ```{r message=FALSE, warning=FALSE, include=FALSE}
-all_adonis <- read_csv("adonis_backgound2021-07-20.csv")
-list_beta_df <- read_csv("betadispersion2021-07-20.csv")
-iphy <- read_rds("Braken_hum&BVs_01.11.21.rds")
+all_adonis <- read_csv("adonis_backgound_padjusted-2021-12-01.csv")
+list_beta_df <- read_csv("betadispersion_padjusted-2021-12-01.csv")
+iphy <- read_rds("Braken_hum&BVs-2021-11-01.rds")
 ```
 
 prepare
@@ -194,6 +195,8 @@ for (variable in unique(sig_adonis$variable)) {
     }
   }
 }
+
+write_csv(sig_adonis, "sig_adonis_padjusted-2021-12-01.csv")
 ```
 
 
@@ -211,12 +214,12 @@ for (variable in unique(sig_adonis$variable)) {
   for (age in unique(sig_adonis$sample_type)) {
     if (nrow(sig_adonis[sig_adonis$variable == variable &
                         sig_adonis$sample_type == age,]) > 0) {
-      sig_status <- sig_adonis[sig_adonis$variable == variable &
+      beta_status <- sig_adonis[sig_adonis$variable == variable &
                                sig_adonis$sample_type == age,]$betadispersion
-      if (is.na(sig_status)) {
+      if (is.na(beta_status)) {
         break
       }
-      if (sig_status) {
+      if (beta_status) {
         counter <- counter + 1
         curr_meta <- iphy %>%
           subset_samples(sample_type == age) %>%
@@ -315,6 +318,6 @@ Step4 collect all result
 ```{r}
 all_pair_adonis <- do.call(rbind, pair_ado)
 
-write_csv(all_pair_adonis, "pairwise_2021-10-04.csv")
+write_csv(all_pair_adonis, "pairwise-2021-11-01.csv")
 ```
 
